@@ -1,0 +1,7 @@
+<Solution>
+    <Folder Name="/src/" />
+    <Folder Name="/src/Dummy/">
+        <Project Path="src/Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj" />
+        <Project Path="src/Vault.Dummy.Web/Vault.Dummy.Web.csproj" />
+    </Folder> 
+</Solution>
