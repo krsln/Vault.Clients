@@ -1,6 +1,8 @@
+using Vault.SDK.Net8.Configuration;
+
 var builder = WebApplication.CreateBuilder(args);
 // ***********************************************
-// builder.Configuration.AddVault();
+builder.Configuration.AddVault();
 // ***********************************************
 
 var app = builder.Build();
