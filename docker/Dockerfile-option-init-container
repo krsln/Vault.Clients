@@ -1,0 +1,8 @@
+﻿FROM python:3.12-alpine
+
+RUN apk add --no-cache ca-certificates \
+ && pip install --no-cache-dir requests
+
+COPY options/python/vault_init_container.py /app/vault_init_container.py
+
+ENTRYPOINT ["python", "/app/vault_init_container.py"]

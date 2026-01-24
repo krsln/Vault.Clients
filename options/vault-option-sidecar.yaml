@@ -1,0 +1,73 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-option-sidecar-sa
+  labels:
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-option-sidecar-sa
+    app.kubernetes.io/version: '1.0'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-option-sidecar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-option-sidecar
+  template:
+    metadata:
+      labels:
+        app: vault-option-sidecar
+    spec:
+      serviceAccountName: vault-option-sidecar-sa
+      containers:
+        # SIDECAR
+        - name: vault-sidecar
+          image: registry.bidyno.com/test/vault-option-sidecar:1.0.0
+          imagePullPolicy: Always
+          command: ["python", "/app/vault_sidecar.py"]
+          env:
+            - name: VAULT_API
+              value: "http://vault-api:80"
+            - name: VAULT_SECRETS_LIST
+              value: "POSTGRES_PASSWORD=db/postgres/password,POSTGRES_USER=db/postgres/user,NOT_EXIST_TEST=not-exist,Redis=db/redis/password"
+            - name: VAULT_REFRESH_INTERVAL
+              value: "-1"   # 300 for 5 dk
+          volumeMounts:
+            - name: vault-env
+              mountPath: /vault/env
+          resources:
+            requests:
+              memory: "32Mi"
+            limits:
+              memory: "64Mi"
+
+        # APP
+        - name: app
+          image: registry.bidyno.com/test/vault-dummy-web:1.0.0
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              until [ -f /vault/env/secrets.json ]; do
+                echo "Waiting for Vault secrets..."
+                sleep 1
+              done
+              exec dotnet Vault.Dummy.Web.dll
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: DOTNET_USE_POLLING_FILE_WATCHER
+              value: "1" 
+          volumeMounts:
+            - name: vault-env
+              mountPath: /vault/env
+
+      volumes:
+        - name: vault-env
+          emptyDir: {}

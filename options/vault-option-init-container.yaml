@@ -1,0 +1,81 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-option-init-container-sa
+  labels:
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-option-init-container-sa
+    app.kubernetes.io/version: '1.0'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-option-init-container
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-option-init-container
+  template:
+    metadata:
+      labels:
+        app: vault-option-init-container
+    spec:
+      serviceAccountName: vault-option-init-container-sa
+      initContainers:
+        - name: vault-auth-init
+          image: registry.bidyno.com/test/vault-option-init-container:1.0.0
+          imagePullPolicy: Always
+          env:
+            - name: VAULT_API
+              value: "http://vault-api:80"
+            - name: VAULT_SECRETS_LIST
+              value: "POSTGRES_PASSWORD=db/postgres/password,POSTGRES_USER=db/postgres/user,NOT_EXIST_TEST=not-exist,Redis=db/redis/password"
+            - name: VAULT_RETRY
+              value: "3"
+          volumeMounts:
+            - name: vault-env-volume
+              mountPath: /vault-env
+          resources:
+            requests:
+              memory: "32Mi"
+            limits:
+              memory: "64Mi"
+      containers:
+        - name: vault-option-init-container
+          image: registry.bidyno.com/test/vault-dummy-web:1.0.0
+          imagePullPolicy: Always
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              if [ -f /vault/env/env-vars ]; then
+                echo "Loading Vault secrets..."
+                . /vault/env/env-vars
+              else
+                echo "WARNING: No vault secrets file found!"
+              fi
+
+              exec dotnet Vault.Dummy.Web.dll
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: DOTNET_USE_POLLING_FILE_WATCHER
+              value: "1"
+            - name: POSTGRES_PASSWORD
+              value: "vault:db/postgres/password"
+            - name: POSTGRES_USER
+              value: "vault:db/postgres/user"
+            - name: NOT_EXIST_TEST
+              value: "vault:not-exist"
+            - name: Redis
+              value: "vault:db/redis/password"
+          volumeMounts:
+            - name: vault-env-volume
+              mountPath: /vault/env
+      volumes:
+        - name: vault-env-volume
+          emptyDir: { }

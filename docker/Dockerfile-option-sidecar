@@ -1,0 +1,8 @@
+﻿FROM python:3.12-alpine
+
+RUN apk add --no-cache ca-certificates \
+ && pip install --no-cache-dir requests
+
+COPY options/python/vault_sidecar.py /app/vault_sidecar.py
+
+ENTRYPOINT ["python", "/app/vault_sidecar.py"]
