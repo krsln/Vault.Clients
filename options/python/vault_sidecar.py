@@ -172,14 +172,11 @@ def main_loop() -> None:
         except Exception as e:
             log.error("Sync cycle failed: %s", e)
 
+       
         if REFRESH <= 0:
-            log.info("One-shot mode enabled, exiting")
-            return
-
-#         if REFRESH == 0:
-#             log.warning("REFRESH=0 is not allowed, sleeping 60s")
-#             time.sleep(60)
-#             continue
+            log.info("One-shot mode enabled, sleeping indefinitely")
+            while True:
+                time.sleep(86400)  # Or any large value to keep container alive
 
         time.sleep(REFRESH)
 

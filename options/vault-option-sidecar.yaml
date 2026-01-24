@@ -36,7 +36,7 @@ spec:
             - name: VAULT_SECRETS_LIST
               value: "POSTGRES_PASSWORD=db/postgres/password,POSTGRES_USER=db/postgres/user,NOT_EXIST_TEST=not-exist,Redis=db/redis/password"
             - name: VAULT_REFRESH_INTERVAL
-              value: "-1"   # 300 for 5 dk
+              value: "-1"   # 300 for 5 dk | -1/0 sets default 86400" for 24h
           volumeMounts:
             - name: vault-env
               mountPath: /vault/env
