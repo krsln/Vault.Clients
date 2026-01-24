@@ -1,1 +1,41 @@
-﻿
+﻿# =========================
+# BUILD STAGE
+# =========================
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+WORKDIR /src
+
+# if not using from nuget
+COPY src/SDK/Vault.SDK.Net8/ ./SDK/Vault.SDK.Net8/
+# Copy only project first for better layer caching
+COPY src/Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj ./Vault.Dummy.Web.SDK.Net8/
+RUN dotnet restore ./Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj
+
+# Copy rest of the source
+COPY src/Vault.Dummy.Web.SDK.Net8/ ./Vault.Dummy.Web.SDK.Net8/
+
+# Publish
+RUN dotnet publish ./Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj \
+    -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false \
+    /p:ContinuousIntegrationBuild=true
+
+# =========================
+# RUNTIME STAGE
+# =========================
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+WORKDIR /app
+
+# Environment
+ENV ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    TZ=UTC
+
+EXPOSE 8080
+
+# Publish edilmiş test projesini kopyala
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["dotnet", "Vault.Dummy.Web.SDK.Net8.dll"]
