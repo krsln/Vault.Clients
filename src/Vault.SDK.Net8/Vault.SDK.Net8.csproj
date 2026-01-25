@@ -5,6 +5,19 @@
         <LangVersion>12</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+
+        <!-- NuGet metadata -->
+        <PackageId>Vault.SDK.Net8</PackageId>
+        <Version>1.0.1</Version>
+        <Authors>qrsln</Authors>
+        <Company>krsln</Company>
+        <Description>Vault SDK for .NET 8</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+        <RepositoryUrl>https://github.com/krsln/Vault</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/krsln/Vault</PackageProjectUrl>
+        <PackageTags>Vault;SDK;.NET8;Configuration</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,6 +25,10 @@
         <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0"/>
         <PackageReference Include="Polly" Version="8.6.5"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>
