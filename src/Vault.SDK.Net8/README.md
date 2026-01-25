@@ -52,11 +52,12 @@ Define your secret references using the `vault:` prefix. Use `Vault__` prefix to
 variables.
 
 ```yaml
+# Example Kubernetes Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: my-dotnet-app
-spec:
+spec: 
   template:
     spec:
       containers:
@@ -64,21 +65,46 @@ spec:
           image: my-registry/my-app:latest
           env:
             # SDK Configuration (Mapped to VaultOptions)
-            - name: Vault__ApiUrl
-              value: "http://vault-internal.namespace.svc.cluster.local"
-            - name: Vault__Debug
-              value: "true"
-            - name: Vault__RetryCount
-              value: "3"
-            
+            - name: Vault__ApiUrl # required
+              value: http://vault-internal.namespace.svc.cluster.local
+
             # Secret References
             - name: POSTGRES_PASSWORD
               value: "vault:db/postgres/password"
-            - name: REDIS_CONNECTION
-              value: "vault:cache/redis/connection-string"
+            - name: POSTGRES_USER
+              value: "vault:db/postgres/user"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-second-app-app
+spec: 
+  template:
+    spec:
+      containers:
+        - name: app
+          image: my-registry/my-second-app:latest
+          env:
+            # SDK Configuration (Mapped to VaultOptions)
+            - name: Vault__ApiUrl # required
+              value: http://vault-internal.namespace.svc.cluster.local
+            - name: Vault__Debug
+              value: "true"
+            - name: Vault__FailOnMissingSecret
+              value: "false"
+            - name: Vault__RetryCount
+              value: "3"
+            - name: Vault__CacheTtl
+              value: "00:05:00"
+            - name: Vault__HttpTimeout
+              value: "00:00:30"
 
+            # Secret References
+            - name: POSTGRES_PASSWORD
+              value: "vault:db/postgres/password"
+            - name: POSTGRES_USER
+              value: "vault:db/postgres/user"
 ```
-
 
 ---
 
@@ -92,7 +118,6 @@ Pod's service account JWT token.
 1. Reads the JWT from `/var/run/secrets/kubernetes.io/serviceaccount/token`.
 2. Authenticates via the Vault endpoint.
 3. Securely handles token lifecycle and renewal.
-
 
 ---
 
