@@ -15,8 +15,8 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-        <RepositoryUrl>https://github.com/krsln/Vault</RepositoryUrl>
-        <PackageProjectUrl>https://github.com/krsln/Vault</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/krsln/Vault.Clients</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/krsln/Vault.Clients</PackageProjectUrl>
         <PackageTags>Vault;SDK;.NET8;Configuration</PackageTags>
     </PropertyGroup>
 
