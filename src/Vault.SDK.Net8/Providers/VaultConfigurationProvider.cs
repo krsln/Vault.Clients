@@ -9,9 +9,10 @@ namespace Vault.SDK.Net8.Providers;
 
 public sealed class VaultConfigurationProvider(ISecretClient client, VaultOptions options) : ConfigurationProvider
 {
-    // Vault refs: config key → vault path
+    // We store a Task instead of a string. This represents the ongoing resolution process.
+    // Multiple callers will await the same Task instance, preventing duplicate HTTP requests.
+    private readonly ConcurrentDictionary<string, Task<string?>> _tasks = new();
     private readonly ConcurrentDictionary<string, string> _vaultRefs = new();
-    private readonly ConcurrentDictionary<string, string?> _resolved = new();
 
     public override void Load()
     {
@@ -22,15 +23,16 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
 
             if (rawValue.StartsWith("vault:", StringComparison.OrdinalIgnoreCase))
             {
-                var secretKey = rawValue["vault:".Length..].Trim();
-
-                if (!string.IsNullOrEmpty(secretKey))
+                var vaultPath = rawValue["vault:".Length..].Trim();
+                if (!string.IsNullOrEmpty(vaultPath))
                 {
-                    _vaultRefs[name] = secretKey;
-                    Data[name] = rawValue; // Placeholder  
+                    _vaultRefs[name] = vaultPath;
+
+                    // Start preload: Add the task to the dictionary to trigger it in the background.
+                    _tasks.TryAdd(name, ResolveSecretInternalAsync(name, vaultPath));
 
                     if (options.Debug)
-                        Console.WriteLine($"[Vault:Config] Registered '{name}' → vault:{secretKey}");
+                        Console.WriteLine($"[Vault:Config] Registered '{name}' → vault:{vaultPath}");
                 }
             }
             else if (!string.IsNullOrEmpty(rawValue))
@@ -38,98 +40,55 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
                 Data[name] = rawValue;
             }
         }
-
-        // Start the preload process but do not swallow errors (logging will be handled in context)
-        // Note: Calling directly instead of Task.Run might be safer in a synchronous context,
-        // but we are preserving the existing asynchronous structure.
-        _ = PreloadSecretsAsync().ContinueWith(task =>
-        {
-            if (task.IsFaulted && options.Debug)
-            {
-                foreach (var ex in task.Exception?.Flatten().InnerExceptions ?? Enumerable.Empty<Exception>())
-                {
-                    Console.Error.WriteLine($"[Vault:Config] Background preload failed: {ex.Message}");
-                }
-            }
-        }, TaskScheduler.Default);
     }
 
-    private async Task PreloadSecretsAsync()
-    {
-        // Limiting the number of parallel requests is a good practice (SemaphoreSlim could be added),
-        // but for simplicity, we continue with Task.WhenAll.
-        var tasks = _vaultRefs.Select(kvp => ResolveSecretAsync(kvp.Key, kvp.Value)).ToList();
-        await Task.WhenAll(tasks);
-    }
-
-    private async Task ResolveSecretAsync(string configKey, string vaultKey)
+    private async Task<string?> ResolveSecretInternalAsync(string configKey, string vaultKey)
     {
         try
         {
             if (options.Debug)
                 Console.WriteLine($"[Vault:Config] Resolving '{configKey}'");
-            
+
             var value = await client.GetSecretAsync(vaultKey, CancellationToken.None);
 
+            // Update the underlying Data dictionary of the ConfigurationProvider
             Data[configKey] = value ?? string.Empty;
-            _resolved[configKey] = value;
-            _vaultRefs.TryRemove(configKey, out _);
 
             if (options.Debug)
                 Console.WriteLine($"[Vault:Config] Resolved '{configKey}'");
 
-            OnReload();
+            return value;
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             HandleMissingSecret(configKey, vaultKey, ex);
+            return null;
         }
         catch (Exception ex)
         {
             HandleResolutionError(configKey, vaultKey, ex);
+            return null;
         }
     }
 
     public override bool TryGet(string key, out string? value)
     {
-        if (_resolved.TryGetValue(key, out value))
-            return true;
-
-        if (_vaultRefs.TryGetValue(key, out var vaultKey))
+        // If this is a vault reference and a resolution task exists
+        if (_tasks.TryGetValue(key, out var task))
         {
-            // Sync-over-async: Acceptable in startup scenarios where necessary.
-            try
-            {
-                value = client.GetSecretAsync(vaultKey, CancellationToken.None)
-                    .ConfigureAwait(false)
-                    .GetAwaiter()
-                    .GetResult();
-
-                Data[key] = value ?? string.Empty;
-                _resolved[key] = value;
-                _vaultRefs.TryRemove(key, out _);
-
-                return true;
-            }
-            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-            {
-                HandleMissingSecret(key, vaultKey, ex);
-                // If no exception is thrown (FailOnMissingSecret is false), return placeholder.
-                return Data.TryGetValue(key, out value);
-            }
-            catch (Exception ex)
-            {
-                HandleResolutionError(key, vaultKey, ex);
-                return Data.TryGetValue(key, out value);
-            }
+            // Sync-over-async: If the task is already running (from Load or previous TryGet),
+            // wait for the same task object instead of starting a new one.
+            value = task.GetAwaiter().GetResult();
+            return true;
         }
 
+        // Standard configuration values
         return Data.TryGetValue(key, out value);
     }
 
     private void HandleMissingSecret(string configKey, string vaultKey, Exception ex)
     {
-        var msg = $"[Vault:Config] Secret not found: '{vaultKey}' for config '{configKey}'";
+        var msg = $"[Vault:Config] Secret not found: '{vaultKey}' for config key '{configKey}'";
 
         if (options.FailOnMissingSecret)
         {
