@@ -24,10 +24,11 @@ public sealed class KubernetesAuthProvider(
                 Content = new StringContent(JsonSerializer.Serialize(new { jwt }), Encoding.UTF8, "application/json")
             };
 
-            if (options.Debug) Console.WriteLine($"[Vault:Auth] Sending auth request to {options.KubernetesAuthEndpoint}");
+            // if (options.Debug)
+            //     Console.WriteLine($"[Vault:Auth] Sending auth request to {options.KubernetesAuthEndpoint}");
             var response = await http.SendAsync<AuthResponse>(request, ct);
 
-            if (options.Debug) Console.WriteLine($"[Vault:Auth] Authentication successful {response.Token.Length}");
+            if (options.Debug) Console.WriteLine($"[Vault:Auth] Authentication successful");
             return response;
         }
         catch (FileNotFoundException ex)
@@ -39,7 +40,8 @@ public sealed class KubernetesAuthProvider(
         }
         catch (Exception ex)
         {
-            if (options.Debug) Console.WriteLine($"[Vault:Auth] Authentication failed: {ex.GetType().Name} - {ex.Message}");
+            if (options.Debug)
+                Console.WriteLine($"[Vault:Auth] Authentication failed: {ex.GetType().Name} - {ex.Message}");
             if (ex.InnerException != null)
                 Console.WriteLine($"[Vault:Auth] Inner: {ex.InnerException.Message}");
             throw;

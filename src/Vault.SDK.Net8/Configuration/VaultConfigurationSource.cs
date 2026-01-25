@@ -26,16 +26,11 @@ public sealed class VaultConfigurationSource(IConfiguration configuration) : ICo
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(5) // To catch DNS changes
         };
-        
-        var httpClientImpl = new HttpClient(handler)
-        {
-            BaseAddress = new Uri(options.ApiUrl!),
-            Timeout = options.HttpTimeout
-        };
+
+        var httpClientImpl = new HttpClient(handler);
 
         // Fixed: Use NullLogger for a no-op implementation
-        ILogger<VaultHttpClient> logger = NullLogger<VaultHttpClient>.Instance;
-        var vaultHttpClient = new VaultHttpClient(httpClientImpl, options, logger);
+        var vaultHttpClient = new VaultHttpClient(httpClientImpl, options);
 
         var authProvider = new KubernetesAuthProvider(vaultHttpClient, options);
         var tokenProvider = new TokenProvider(authProvider);

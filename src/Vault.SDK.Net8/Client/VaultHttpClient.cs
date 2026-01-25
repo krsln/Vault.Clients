@@ -11,35 +11,39 @@ namespace Vault.SDK.Net8.Client;
 public class VaultHttpClient : IVaultHttpClient
 {
     private readonly HttpClient _httpClient;
-    private readonly VaultOptions _options;
-    private readonly ILogger<VaultHttpClient> _logger;
     private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
+    private readonly JsonSerializerOptions _json;
 
-    public VaultHttpClient(HttpClient httpClient, VaultOptions options, ILogger<VaultHttpClient> logger)
+    public VaultHttpClient(HttpClient httpClient, VaultOptions optionsParam )
     {
+        var options = optionsParam ?? throw new ArgumentNullException(nameof(optionsParam));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Set global timeout
-        _httpClient.Timeout = _options.HttpTimeout;
+        _httpClient.BaseAddress = new Uri(options.ApiUrl!.TrimEnd('/'));
+        _httpClient.Timeout = options.HttpTimeout;
+
+        _json = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
 
         // Define retry policy: Retry on transient HTTP errors (5xx, 408) or timeouts, up to RetryCount times, with exponential backoff
         _retryPolicy = Policy
             .Handle<HttpRequestException>()
-            .OrResult<HttpResponseMessage>(response =>
-                (int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
-            .WaitAndRetryAsync(_options.RetryCount,
-                retryAttempt =>
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff: 1s, 2s, 4s, etc.
+            .OrResult<HttpResponseMessage>(res =>
+                (int)res.StatusCode >= 500 || res.StatusCode == HttpStatusCode.RequestTimeout)
+            // Exponential backoff: 1s, 2s, 4s, etc.
+            .WaitAndRetryAsync(options.RetryCount, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                 onRetry: (outcome, timespan, retryAttempt, context) =>
                 {
-                    _logger?.LogWarning(
-                        $"Retry {retryAttempt} after {timespan.TotalSeconds}s due to: {outcome.Exception?.Message ?? outcome.Result?.ReasonPhrase}");
+                    if (options.Debug)
+                        Console.Error.WriteLine(
+                            $"[Vault:Client] Retry {retryAttempt} after {timespan.TotalSeconds}s due to: {outcome.Exception?.Message ?? outcome.Result?.ReasonPhrase}");
                 });
     }
 
-    public async Task<T?> SendAsync<T>(HttpRequestMessage requestTemplate, CancellationToken ct)
+    public async Task<T> SendAsync<T>(HttpRequestMessage requestTemplate, CancellationToken ct = default)
     {
         // Use Polly to execute with retries, recreating the request each time
         var response = await _retryPolicy.ExecuteAsync(async () =>
@@ -52,8 +56,8 @@ public class VaultHttpClient : IVaultHttpClient
         response.EnsureSuccessStatusCode(); // Throw if not 2xx
 
         // Assuming deserialization logic here (e.g., using System.Text.Json)
-        var content = await response.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<T>(content);
+        var json = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<T>(json, _json)!;
     }
 
     // Helper to clone HttpRequestMessage (including content if any)

@@ -11,27 +11,18 @@ public sealed class TokenProvider(IAuthProvider auth) : ITokenProvider
 
     public async Task<VaultToken> GetTokenAsync(VaultOptions options, CancellationToken ct)
     {
-        if (options.Debug)
-            Console.WriteLine(
-                $"[Vault:Token] GetTokenAsync called. Current cached: {(_cached != null ? "yes" : "no")}, Expired: {(_cached?.IsExpired ?? true)}");
-
         if (_cached is not null && !_cached.IsExpired)
         {
-            if (options.Debug) Console.WriteLine("[Vault:Token] Fast-path hit - returning cached token");
+            // if (options.Debug) Console.WriteLine("[Vault:Token] Fast-path hit - returning cached token");
             return _cached;
         }
 
-        if (options.Debug) Console.WriteLine("[Vault:Token] Entering lock...");
         await _lock.WaitAsync(ct);
         try
         {
-            if (options.Debug)
-                Console.WriteLine(
-                    $"[Vault:Token] Inside lock. Cached now: {(_cached != null ? "yes" : "no")}, Expired: {(_cached?.IsExpired ?? true)}");
-
             if (_cached is not null && !_cached.IsExpired)
             {
-                if (options.Debug) Console.WriteLine("[Vault:Token] Double-check hit - returning cached");
+                // if (options.Debug) Console.WriteLine("[Vault:Token] Double-check hit - returning cached");
                 return _cached;
             }
 
@@ -49,7 +40,7 @@ public sealed class TokenProvider(IAuthProvider auth) : ITokenProvider
         finally
         {
             _lock.Release();
-            if (options.Debug) Console.WriteLine("[Vault:Token] Lock released");
+            // if (options.Debug) Console.WriteLine("[Vault:Token] Lock released");
         }
     }
 }
