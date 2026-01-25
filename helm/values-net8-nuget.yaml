@@ -1,0 +1,37 @@
+imagePullSecrets:
+  - name: reg-hub-secret
+
+fullnameOverride: vault-dummy-web-net8-nuget
+
+image:
+  repository: registry.bidyno.com/test/vault-dummy-web-net8-nuget
+  tag: "1.0.0"
+  pullPolicy: Always
+
+extraEnvs:
+  - name: Vault__ApiUrl # required
+    value: http://vault-api:80
+  - name: Vault__KubernetesAuthEndpoint
+    value: "/api/auth/k8s"
+  - name: Vault__SecretReadEndpoint
+    value: "/api/v1/Secret/read"
+  - name: Vault__Debug
+    value: "true"
+  - name: Vault__FailOnMissingSecret
+    value: "false"
+  - name: Vault__RetryCount
+    value: "3"
+  - name: Vault__CacheTtl
+    value: "00:05:00"
+  - name: Vault__HttpTimeout
+    value: "00:00:30"
+
+  - name: POSTGRES_PASSWORD
+    value: "vault:db/postgres/password"
+  - name: POSTGRES_USER
+    value: "vault:db/postgres/user"
+  - name: NOT_EXIST_TEST
+    value: "vault:not-exist"
+  - name: Redis
+    value: "vault:db/redis/password"
+ 
