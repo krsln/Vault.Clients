@@ -30,7 +30,7 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
                     Data[name] = rawValue; // Placeholder  
 
                     if (options.Debug)
-                        Console.WriteLine($"[VaultEnv] Registered '{name}' → vault:{secretKey}");
+                        Console.WriteLine($"[Vault:Config] Registered '{name}' → vault:{secretKey}");
                 }
             }
             else if (!string.IsNullOrEmpty(rawValue))
@@ -48,7 +48,7 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
             {
                 foreach (var ex in task.Exception?.Flatten().InnerExceptions ?? Enumerable.Empty<Exception>())
                 {
-                    Console.Error.WriteLine($"[VaultEnv] Background preload failed: {ex.Message}");
+                    Console.Error.WriteLine($"[Vault:Config] Background preload failed: {ex.Message}");
                 }
             }
         }, TaskScheduler.Default);
@@ -66,6 +66,9 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
     {
         try
         {
+            if (options.Debug)
+                Console.WriteLine($"[Vault:Config] Resolving '{configKey}'");
+            
             var value = await client.GetSecretAsync(vaultKey, CancellationToken.None);
 
             Data[configKey] = value ?? string.Empty;
@@ -73,7 +76,7 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
             _vaultRefs.TryRemove(configKey, out _);
 
             if (options.Debug)
-                Console.WriteLine($"[VaultEnv] Resolved '{configKey}'");
+                Console.WriteLine($"[Vault:Config] Resolved '{configKey}'");
 
             OnReload();
         }
@@ -126,7 +129,7 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
 
     private void HandleMissingSecret(string configKey, string vaultKey, Exception ex)
     {
-        var msg = $"[VaultEnv] Secret not found: '{vaultKey}' for config '{configKey}'";
+        var msg = $"[Vault:Config] Secret not found: '{vaultKey}' for config '{configKey}'";
 
         if (options.FailOnMissingSecret)
         {
@@ -138,7 +141,7 @@ public sealed class VaultConfigurationProvider(ISecretClient client, VaultOption
 
     private void HandleResolutionError(string configKey, string vaultKey, Exception ex)
     {
-        var msg = $"[VaultEnv] Error resolving '{configKey}': {ex.Message}";
+        var msg = $"[Vault:Config] Error resolving '{configKey}': {ex.Message}";
 
         if (options.FailOnMissingSecret)
         {

@@ -26,7 +26,12 @@ public sealed class VaultConfigurationSource(IConfiguration configuration) : ICo
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(5) // To catch DNS changes
         };
-        var httpClientImpl = new HttpClient(handler);
+        
+        var httpClientImpl = new HttpClient(handler)
+        {
+            BaseAddress = new Uri(options.ApiUrl!),
+            Timeout = options.HttpTimeout
+        };
 
         // Fixed: Use NullLogger for a no-op implementation
         ILogger<VaultHttpClient> logger = NullLogger<VaultHttpClient>.Instance;

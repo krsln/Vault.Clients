@@ -1,44 +1,87 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Polly;
+using Polly.Retry;
 using Vault.SDK.Net8.Interfaces;
 using Vault.SDK.Net8.Misc;
 
 namespace Vault.SDK.Net8.Client;
 
-public sealed class VaultHttpClient : IVaultHttpClient
+public class VaultHttpClient : IVaultHttpClient
 {
-    private readonly HttpClient _http;
-    private readonly JsonSerializerOptions _json;
-    private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
+    private readonly HttpClient _httpClient;
+    private readonly VaultOptions _options;
     private readonly ILogger<VaultHttpClient> _logger;
+    private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
 
-    public VaultHttpClient(HttpClient http, VaultOptions options, ILogger<VaultHttpClient> logger)
+    public VaultHttpClient(HttpClient httpClient, VaultOptions options, ILogger<VaultHttpClient> logger)
     {
-        if (string.IsNullOrWhiteSpace(options.ApiUrl))
-            throw new ArgumentException("Vault apiUrl must be provided", nameof(options.ApiUrl));
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        _logger = logger;
-        _http = http ?? throw new ArgumentNullException(nameof(http));
-        _http.BaseAddress = new Uri(options.ApiUrl.TrimEnd('/'));
-        _http.Timeout = options.HttpTimeout;
+        // Set global timeout
+        _httpClient.Timeout = _options.HttpTimeout;
 
-        _json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
-        _retryPolicy = Policy.HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
-            .WaitAndRetryAsync(options.RetryCount, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                (result, timespan, retryCount, context) =>
+        // Define retry policy: Retry on transient HTTP errors (5xx, 408) or timeouts, up to RetryCount times, with exponential backoff
+        _retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .OrResult<HttpResponseMessage>(response =>
+                (int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+            .WaitAndRetryAsync(_options.RetryCount,
+                retryAttempt =>
+                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff: 1s, 2s, 4s, etc.
+                onRetry: (outcome, timespan, retryAttempt, context) =>
                 {
-                    _logger.LogWarning("Vault request failed. Retry {Count} after {Seconds}s. StatusCode: {Status}",
-                        retryCount, timespan.TotalSeconds, result.Result?.StatusCode);
+                    _logger?.LogWarning(
+                        $"Retry {retryAttempt} after {timespan.TotalSeconds}s due to: {outcome.Exception?.Message ?? outcome.Result?.ReasonPhrase}");
                 });
     }
 
-    public async Task<T> SendAsync<T>(HttpRequestMessage request, CancellationToken ct)
+    public async Task<T?> SendAsync<T>(HttpRequestMessage requestTemplate, CancellationToken ct)
     {
-        var response = await _retryPolicy.ExecuteAsync(() => _http.SendAsync(request, ct));
-        response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<T>(json, _json)!;
+        // Use Polly to execute with retries, recreating the request each time
+        var response = await _retryPolicy.ExecuteAsync(async () =>
+        {
+            // IMPORTANT: Clone or recreate the request for each attempt to avoid "already sent" error
+            var request = await CloneRequestAsync(requestTemplate); // Clone method below
+            return await _httpClient.SendAsync(request, ct);
+        });
+
+        response.EnsureSuccessStatusCode(); // Throw if not 2xx
+
+        // Assuming deserialization logic here (e.g., using System.Text.Json)
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<T>(content);
+    }
+
+    // Helper to clone HttpRequestMessage (including content if any)
+    private async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage original)
+    {
+        var clone = new HttpRequestMessage(original.Method, original.RequestUri);
+
+        // Copy headers
+        foreach (var header in original.Headers)
+        {
+            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        // Copy content if present (e.g., for POST with body)
+        if (original.Content != null)
+        {
+            var contentStream = await original.Content.ReadAsStreamAsync();
+            contentStream.Position = 0; // Reset stream if reusable
+            clone.Content = new StreamContent(contentStream);
+            foreach (var header in original.Content.Headers)
+            {
+                clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
+        clone.Version = original.Version;
+        clone.VersionPolicy = original.VersionPolicy;
+
+        return clone;
     }
 }

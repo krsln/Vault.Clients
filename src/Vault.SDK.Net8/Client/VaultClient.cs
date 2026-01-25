@@ -19,9 +19,10 @@ public sealed class VaultClient(
         if (cache.TryGet(encodedKey, out var cached))
             return cached;
 
-        var token = await tokens.GetTokenAsync(ct);
+        var token = await tokens.GetTokenAsync(options, ct);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{options.SecretReadEndpoint.TrimEnd('/')}{encodedKey}");
+        var path = $"{options.SecretReadEndpoint.TrimEnd('/')}/{encodedKey}";
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         var response = await http.SendAsync<SecretResponse>(request, ct);
