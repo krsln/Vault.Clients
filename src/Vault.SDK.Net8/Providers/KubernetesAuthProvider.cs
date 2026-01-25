@@ -2,20 +2,22 @@ using System.Text;
 using System.Text.Json;
 using Vault.SDK.Net8.DTO;
 using Vault.SDK.Net8.Interfaces;
+using Vault.SDK.Net8.Misc;
 
 namespace Vault.SDK.Net8.Providers;
 
 public sealed class KubernetesAuthProvider(
     IVaultHttpClient http,
-    string tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token")
-    : IAuthProvider
+    VaultOptions options,
+    string tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+) : IAuthProvider
 {
     public async Task<AuthResponse> AuthenticateAsync(CancellationToken ct)
     {
         try
         {
             var jwt = await File.ReadAllTextAsync(tokenPath, ct);
-            var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/k8s")
+            var request = new HttpRequestMessage(HttpMethod.Post, options.KubernetesAuthEndpoint)
             {
                 Content = new StringContent(JsonSerializer.Serialize(new { jwt }), Encoding.UTF8, "application/json")
             };

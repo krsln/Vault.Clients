@@ -1,12 +1,12 @@
 ﻿# =========================
 # BUILD STAGE
 # =========================
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 WORKDIR /src
 
 # if not using from nuget
-COPY src/SDK/Vault.SDK.Net8/ ./SDK/Vault.SDK.Net8/
+COPY src/Vault.SDK.Net8/ ./Vault.SDK.Net8/
 # Copy only project first for better layer caching
 COPY src/Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj ./Vault.Dummy.Web.SDK.Net8/
 RUN dotnet restore ./Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj
@@ -24,7 +24,7 @@ RUN dotnet publish ./Vault.Dummy.Web.SDK.Net8/Vault.Dummy.Web.SDK.Net8.csproj \
 # =========================
 # RUNTIME STAGE
 # =========================
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 
 WORKDIR /app
 

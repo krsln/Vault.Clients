@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions; // Added for NullLogger
 using Vault.SDK.Net8.Client;
 using Vault.SDK.Net8.Misc;
 using Vault.SDK.Net8.Providers;
@@ -18,13 +20,24 @@ public sealed class VaultConfigurationSource(IConfiguration configuration) : ICo
                 "Vault ApiUrl must be provided. Ensure 'Vault:ApiUrl' is set.");
         }
 
-        var httpClient = new VaultHttpClient(new HttpClient(), options);
+        // HttpClient setup with SocketsHttpHandler (for DNS refresh)
+        // Configuration phase, so we can't use IHttpClientFactory; this manual handler is important.
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5) // To catch DNS changes
+        };
+        var httpClientImpl = new HttpClient(handler);
 
-        var authProvider = new KubernetesAuthProvider(httpClient);
+        // Fixed: Use NullLogger for a no-op implementation
+        ILogger<VaultHttpClient> logger = NullLogger<VaultHttpClient>.Instance;
+        var vaultHttpClient = new VaultHttpClient(httpClientImpl, options, logger);
+
+        var authProvider = new KubernetesAuthProvider(vaultHttpClient, options);
         var tokenProvider = new TokenProvider(authProvider);
         var cache = new SecretCache();
-        var client = new VaultClient(httpClient, tokenProvider, cache);
 
-        return new VaultConfigurationProvider(client, options.Debug);
+        var client = new VaultClient(vaultHttpClient, tokenProvider, cache, options);
+
+        return new VaultConfigurationProvider(client, options);
     }
 }

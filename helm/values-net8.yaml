@@ -8,12 +8,24 @@ image:
   tag: "1.0.0"
   pullPolicy: Always
 
-
 extraEnvs:
-  - name: Vault__ApiUrl
-    value: http://vault-api
+  - name: Vault__ApiUrl # required
+    value: http://vault-api:80
+  - name: Vault__KubernetesAuthEndpoint
+    value: "/api/auth/k8s"
+  - name: Vault__SecretReadEndpoint
+    value: "/api/v1/Secret/read"
   - name: Vault__Debug
     value: "true"
+  - name: Vault__FailOnMissingSecret
+    value: "false"
+  - name: Vault__RetryCount
+    value: "3"
+  - name: Vault__CacheTtl
+    value: "00:05:00"
+  - name: Vault__HttpTimeout
+    value: "00:00:30"
+
   - name: POSTGRES_PASSWORD
     value: "vault:db/postgres/password"
   - name: POSTGRES_USER
@@ -22,3 +34,4 @@ extraEnvs:
     value: "vault:not-exist"
   - name: Redis
     value: "vault:db/redis/password"
+ 

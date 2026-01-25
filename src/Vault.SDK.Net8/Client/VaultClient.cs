@@ -21,8 +21,7 @@ public sealed class VaultClient(
 
         var token = await tokens.GetTokenAsync(ct);
 
-
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/Secret/read/{encodedKey}");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{options.SecretReadEndpoint.TrimEnd('/')}{encodedKey}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         var response = await http.SendAsync<SecretResponse>(request, ct);

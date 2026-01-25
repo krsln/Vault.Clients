@@ -2,6 +2,21 @@ using Vault.SDK.Net8.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 // ***********************************************
+// if (builder.Environment.IsDevelopment())
+// {
+//     builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+//     {
+//         ["Vault:Debug"] = "true",
+//         ["Vault:FailOnMissingSecret"] = "false",
+//         ["Vault:RetryCount"] = "3",
+//         ["Vault:CacheTtl"] = "00:05:00",
+//         ["Vault:HttpTimeout"] = "00:00:30",
+//         ["Vault:ApiUrl"] = "http://localhost:5149",
+//         ["Vault:KubernetesAuthEndpoint"] = "/api/auth/k8s",
+//         ["Vault:SecretReadEndpoint"] = "/api/v1/Secret/read",
+//     });
+// }
+
 builder.Configuration.AddVault();
 // ***********************************************
 
