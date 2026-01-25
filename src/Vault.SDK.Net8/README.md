@@ -34,7 +34,7 @@ dotnet add package Vault.SDK.Net8
 
 ### 1. Register the Provider
 
-In your `Program.cs`, add the Vault configuration source to your builder:
+In your `Program.cs`, add the Vault configuration source:
 
 ```csharp
 using Vault.SDK.Net8.Configuration;
@@ -46,31 +46,53 @@ builder.Configuration.AddVault();
 
 ```
 
-### 2. Define Secrets in Environment Variables
+### 2. Kubernetes Deployment Example
 
-Map your configuration keys to Vault paths using the `vault:` prefix in your environment settings (e.g., `values.yaml`
-for K8s or local `.env`):
+Define your secret references using the `vault:` prefix. Use `Vault__` prefix to override SDK settings via environment
+variables.
 
-| Key           | Value                                             |
-|---------------|---------------------------------------------------|
-| `DB_PASSWORD` | `vault:secrets/data/production/database#password` |
-| `API_KEY`     | `vault:secrets/data/common/services#stripe_key`   |
-
-### 3. Consume Secrets
-
-Access secrets just like any other configuration value. The SDK handles the authentication and resolution transparently.
-
-```csharp
-public class PaymentService(IConfiguration configuration)
-{
-    public void Process()
-    {
-        // Resolved automatically from Vault
-        var apiKey = configuration["API_KEY"];
-    }
-}
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-dotnet-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: my-registry/my-app:latest
+          env:
+            # SDK Configuration (Mapped to VaultOptions)
+            - name: Vault__ApiUrl
+              value: "http://vault-internal.namespace.svc.cluster.local"
+            - name: Vault__Debug
+              value: "true"
+            - name: Vault__RetryCount
+              value: "3"
+            
+            # Secret References
+            - name: POSTGRES_PASSWORD
+              value: "vault:db/postgres/password"
+            - name: REDIS_CONNECTION
+              value: "vault:cache/redis/connection-string"
 
 ```
+
+
+---
+
+## 🛡️ Kubernetes Authentication
+
+The SDK is designed to work seamlessly within Kubernetes clusters. It automatically attempts to authenticate using the
+Pod's service account JWT token.
+
+**How it works:**
+
+1. Reads the JWT from `/var/run/secrets/kubernetes.io/serviceaccount/token`.
+2. Authenticates via the Vault endpoint.
+3. Securely handles token lifecycle and renewal.
+
 
 ---
 
@@ -89,11 +111,14 @@ Variables:
 
 ---
 
-## 🛠️ Architecture
+## 🛠️ Internal Architecture
 
-The SDK utilizes a **Task-based Cache** mechanism. When the application starts, it performs a "Preload." If a value is
-requested via `TryGet` before the background task completes, the provider waits for the *existing* task rather than
-spawning a new request. This ensures optimal performance and prevents hitting Vault API rate limits.
+The provider uses a **Task-based Synchronization** pattern:
+
+1. **Discovery:** Scans environment variables for the `vault:` prefix.
+2. **Preload:** Initiates asynchronous `Task` objects for each secret.
+3. **Atomic Resolution:** If a key is accessed via `TryGet` before the background task finishes, the caller waits for
+   the *existing* task, ensuring only one HTTP request is ever made.
 
 ---
 
