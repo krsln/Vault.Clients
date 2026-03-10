@@ -26,7 +26,7 @@ spec:
       serviceAccountName: vault-option-init-container-sa
       initContainers:
         - name: vault-auth-init
-          image: registry.bidyno.com/test/vault-option-init-container:1.0.0
+          image: registry.bibanka.com/test/vault-option-init-container:1.0.0
           imagePullPolicy: Always
           env:
             - name: VAULT_API
@@ -45,7 +45,7 @@ spec:
               memory: "64Mi"
       containers:
         - name: vault-option-init-container
-          image: registry.bidyno.com/test/vault-dummy-web:1.0.0
+          image: registry.bibanka.com/test/vault-dummy-web:1.0.0
           imagePullPolicy: Always
           command: [ "/bin/sh", "-c" ]
           args:

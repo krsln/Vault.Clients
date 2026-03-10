@@ -27,7 +27,7 @@ spec:
       containers:
         # SIDECAR
         - name: vault-sidecar
-          image: registry.bidyno.com/test/vault-option-sidecar:1.0.0
+          image: registry.bibanka.com/test/vault-option-sidecar:1.0.0
           imagePullPolicy: Always
           command: ["python", "/app/vault_sidecar.py"]
           env:
@@ -48,7 +48,7 @@ spec:
 
         # APP
         - name: app
-          image: registry.bidyno.com/test/vault-dummy-web:1.0.0
+          image: registry.bibanka.com/test/vault-dummy-web:1.0.0
           command: ["/bin/sh","-c"]
           args:
             - |
