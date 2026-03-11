@@ -4,12 +4,12 @@
 
 ```shell
 docker buildx build --platform linux/amd64 \
--t registry.bidyno.com/test/vault-option-init-container:1.0.0 \
+-t qrsln/vault-option-init-container:1.0.0 \
 -f ./docker/Dockerfile-option-init-container . \
 --push
 
 docker buildx build --platform linux/amd64 \
--t registry.bidyno.com/test/vault-option-sidecar:1.0.0 \
+-t qrsln/vault-option-sidecar:1.0.0 \
 -f ./docker/Dockerfile-option-sidecar . \
 --push
 
